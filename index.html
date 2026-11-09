@@ -1,0 +1,1682 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ANSS HUB — Explorateur territorial</title>
+
+  <!-- ArcGIS Maps SDK 4.32: the version paired by Esri with ArcGIS Enterprise 11.5. -->
+  <link rel="preconnect" href="https://js.arcgis.com">
+  <link rel="preconnect" href="https://basemaps.arcgis.com" crossorigin>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.32/"></script>
+
+  <style>
+    :root {
+      --anss-ink: #0a0d12;
+      --anss-muted: #787d89;
+      --anss-green-900: #165225;
+      --anss-green-700: #25883e;
+      --anss-green-500: #43b760;
+      --anss-green-400: #5ade7b;
+      --anss-green-100: #e4f7e8;
+      --anss-green-200: #a4e5b2;
+      --anss-surface: #fcfcfd;
+      --anss-line: #e8e9eb;
+      --anss-shadow: 0 20px 45px rgba(18, 29, 22, 0.14);
+      --anss-font: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background: var(--anss-surface);
+    }
+
+    body {
+      overflow-x: clip;
+      color: var(--anss-ink);
+      font-family: var(--anss-font);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    .anss-explorer {
+      position: relative;
+      z-index: 2;
+      isolation: isolate;
+      width: 100%;
+      min-height: 965px;
+      overflow: visible;
+      border-bottom: 1px solid var(--anss-line);
+      background: var(--anss-surface);
+    }
+
+    .anss-explorer__map-shell {
+      position: absolute;
+      z-index: 0;
+      inset: 275px 0 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0) 0 24%, rgba(255, 255, 255, 0.26) 70%),
+        #eef1ef;
+    }
+
+    #mapView {
+      position: absolute;
+      inset: 0;
+      filter: contrast(0.92) brightness(1.05);
+      opacity: 1;
+    }
+
+    .anss-explorer__map-veil {
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, var(--anss-surface) 0%, rgba(252, 252, 253, 0.95) 15%, rgba(252, 252, 253, 0.62) 34%, rgba(252, 252, 253, 0.08) 66%, rgba(252, 252, 253, 0) 100%),
+        linear-gradient(90deg, rgba(252, 252, 253, 0.22), rgba(252, 252, 253, 0.04) 50%, rgba(252, 252, 253, 0.22));
+    }
+
+    .anss-explorer__content {
+      position: relative;
+      z-index: 4;
+      width: min(1080px, calc(100% - 40px));
+      margin: 0 auto;
+      padding-top: 60px;
+      text-align: center;
+    }
+
+    .anss-explorer__badge {
+      display: inline-flex;
+      min-width: 102px;
+      min-height: 30px;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 14px;
+      border: 1px solid var(--anss-green-200);
+      border-radius: 999px;
+      color: var(--anss-green-900);
+      background: var(--anss-green-100);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .anss-explorer__title {
+      max-width: 820px;
+      margin: 20px auto 0;
+      color: var(--anss-ink);
+      font-size: clamp(48px, 4.35vw, 62px);
+      font-weight: 750;
+      letter-spacing: -0.045em;
+      line-height: 0.96;
+      text-wrap: balance;
+    }
+
+    .anss-explorer__title-line {
+      display: block;
+    }
+
+    .anss-explorer__title-gradient {
+      color: var(--anss-green-500);
+      background: linear-gradient(90deg, #368c4c 0%, var(--anss-green-400) 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .anss-explorer__intro {
+      max-width: 820px;
+      margin: 28px auto 0;
+      color: var(--anss-muted);
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.55;
+      text-wrap: balance;
+    }
+
+    .territory-search {
+      position: relative;
+      width: min(480px, calc(100% - 24px));
+      margin: 62px auto 0;
+      text-align: left;
+    }
+
+    .territory-search__field {
+      display: flex;
+      width: 100%;
+      min-height: 60px;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 8px 7px 20px;
+      border: 1px solid #d9dcde;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 15px 24px rgba(27, 35, 31, 0.12);
+      backdrop-filter: blur(12px);
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .territory-search__field:focus-within {
+      border-color: var(--anss-green-500);
+      box-shadow: 0 0 0 4px rgba(67, 183, 96, 0.16), 0 15px 24px rgba(27, 35, 31, 0.12);
+    }
+
+    .territory-search__input {
+      min-width: 0;
+      flex: 1;
+      border: 0;
+      outline: 0;
+      color: #252b37;
+      background: transparent;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .territory-search__input::placeholder {
+      color: #858b98;
+      opacity: 1;
+    }
+
+    .territory-search__button {
+      display: inline-grid;
+      width: 46px;
+      height: 46px;
+      flex: 0 0 46px;
+      place-items: center;
+      border: 0;
+      border-radius: 13px;
+      color: #fff;
+      background: var(--anss-green-700);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .territory-search__button:hover {
+      background: var(--anss-green-900);
+      box-shadow: 0 8px 18px rgba(22, 82, 37, 0.24);
+      transform: translateY(-1px);
+    }
+
+    .territory-search__button:active {
+      box-shadow: none;
+      transform: translateY(0);
+    }
+
+    .territory-search__button:focus-visible {
+      outline: 3px solid var(--anss-green-400);
+      outline-offset: 3px;
+    }
+
+    .territory-search__button svg {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+    }
+
+    .territory-search__results {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      max-height: 288px;
+      margin: 0;
+      padding: 6px;
+      overflow: auto;
+      border: 1px solid var(--anss-line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: var(--anss-shadow);
+      list-style: none;
+    }
+
+    .territory-search__results[hidden] {
+      display: none;
+    }
+
+    .territory-search__option {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 10px;
+      color: #252b37;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .territory-search__option:hover,
+    .territory-search__option:focus-visible,
+    .territory-search__option[aria-selected="true"] {
+      outline: 0;
+      color: var(--anss-green-900);
+      background: #f0faf3;
+    }
+
+    .territory-search__empty {
+      padding: 14px 12px;
+      color: var(--anss-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .territory-search__status {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .territory-card {
+      position: absolute;
+      z-index: 8;
+      left: 50%;
+      top: 655px;
+      width: min(294px, calc(100% - 32px));
+      overflow: visible;
+      border: 1px solid #eef0f1;
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 15px 34px rgba(18, 29, 22, 0.14);
+      transform: translate(-50%, -100%);
+      transition: opacity 160ms ease, transform 160ms ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .territory-card::after {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      border-right: 1px solid #eef0f1;
+      border-bottom: 1px solid #eef0f1;
+      background: #fff;
+      content: "";
+      transform: translate(-50%, -8px) rotate(45deg);
+    }
+
+    .territory-card[hidden] {
+      display: none;
+    }
+
+    .territory-card__title {
+      margin: 0;
+      padding: 13px 15px 10px;
+      border-bottom: 1px solid #e2e5e8;
+      color: #252b37;
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.35;
+      text-align: left;
+    }
+
+    .territory-card__metrics {
+      display: grid;
+      gap: 11px;
+      margin: 0;
+      padding: 13px 15px 15px;
+    }
+
+    .territory-card__metric {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: baseline;
+    }
+
+    .territory-card__metric dt,
+    .territory-card__metric dd {
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .territory-card__metric dt {
+      color: #787d89;
+      font-size: 12px;
+      font-weight: 550;
+      text-align: left;
+    }
+
+    .territory-card__metric dd {
+      color: #343945;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .anss-explorer__demo-note {
+      position: absolute;
+      z-index: 6;
+      right: 14px;
+      bottom: 10px;
+      margin: 0;
+      padding: 5px 8px;
+      border-radius: 6px;
+      color: #606771;
+      background: rgba(255, 255, 255, 0.82);
+      font-size: 10px;
+      line-height: 1.3;
+      backdrop-filter: blur(5px);
+    }
+
+    .anss-explorer__loading {
+      position: absolute;
+      z-index: 7;
+      top: 468px;
+      left: 50%;
+      display: inline-flex;
+      min-height: 32px;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 12px;
+      border: 1px solid rgba(164, 229, 178, 0.82);
+      border-radius: 999px;
+      color: var(--anss-green-900);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 22px rgba(22, 82, 37, 0.08);
+      font-size: 12px;
+      font-weight: 600;
+      pointer-events: none;
+      transform: translateX(-50%);
+      transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .anss-explorer__loading[hidden] {
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 4px);
+    }
+
+    .anss-kpis {
+      position: absolute;
+      z-index: 15;
+      right: 0;
+      bottom: -80px;
+      left: 0;
+      width: min(1200px, calc(100% - 48px));
+      min-height: 164px;
+      margin: 0 auto;
+      padding: 28px 36px;
+      border: 1px solid #d5d6da;
+      border-radius: 35px;
+      background: #fff;
+      box-shadow: 0 22px 54px rgba(10, 13, 18, 0.1);
+    }
+
+    .anss-kpis__grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      min-height: 106px;
+      margin: 0;
+    }
+
+    .anss-kpis__item {
+      position: relative;
+      min-width: 0;
+      margin: 0;
+      padding: 4px clamp(20px, 2.35vw, 34px) 0;
+      border-radius: 16px;
+      text-align: left;
+      transition: background-color 180ms ease;
+    }
+
+    .anss-kpis__item:first-child {
+      padding-left: 0;
+    }
+
+    .anss-kpis__item:last-child {
+      padding-right: 0;
+    }
+
+    .anss-kpis__item + .anss-kpis__item::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 1px;
+      background: #e6e8ea;
+      content: "";
+    }
+
+    .anss-kpis__item:hover {
+      background: #f4fbf6;
+    }
+
+    .anss-kpis__label,
+    .anss-kpis__value,
+    .anss-kpis__trend {
+      display: block;
+      margin: 0;
+    }
+
+    .anss-kpis__label {
+      color: #787d89;
+      font-size: 16px;
+      font-weight: 550;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+
+    .anss-kpis__value {
+      margin-top: 8px;
+      color: var(--anss-green-900);
+      font-size: clamp(28px, 2.65vw, 36px);
+      font-variant-numeric: tabular-nums;
+      font-weight: 750;
+      letter-spacing: -0.01em;
+      line-height: 1.05;
+      white-space: nowrap;
+    }
+
+    .anss-kpis__trend {
+      margin-top: 10px;
+      color: #289242;
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+
+    .anss-kpis__trend--down {
+      color: #f04438;
+    }
+
+    .anss-kpis__trend-icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      margin-right: 5px;
+      vertical-align: -4px;
+    }
+
+    .anss-services-v2 {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      margin: 0;
+      padding: 208px 24px 96px;
+      color: var(--anss-ink);
+      background: var(--anss-surface);
+    }
+
+    .anss-services-container {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .anss-services-header {
+      max-width: 760px;
+      margin: 0 auto 46px;
+      text-align: center;
+    }
+
+    .anss-services-badge {
+      display: inline-flex;
+      min-height: 30px;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      padding: 6px 13px;
+      border: 1px solid var(--anss-green-200);
+      border-radius: 999px;
+      color: var(--anss-green-900);
+      background: var(--anss-green-100);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.09em;
+      line-height: 1.35;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .anss-services-badge::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #368c4c;
+      box-shadow: 0 0 0 3px rgba(54, 140, 76, 0.12);
+      content: "";
+    }
+
+    .anss-services-title {
+      margin: 0;
+      color: var(--anss-ink);
+      font-size: clamp(32px, 4.4vw, 48px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.08;
+      text-wrap: balance;
+    }
+
+    .anss-services-title span {
+      color: #368c4c;
+    }
+
+    .anss-services-subtitle {
+      max-width: 680px;
+      margin: 18px auto 0;
+      color: #626975;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.7;
+      text-wrap: pretty;
+    }
+
+    .anss-services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: stretch;
+      gap: 24px;
+    }
+
+    .anss-service-card {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      margin: 0;
+      padding: 16px 16px 0;
+      overflow: hidden;
+      border: 1px solid #d5d6da;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 12px 34px rgba(10, 13, 18, 0.07);
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    .anss-service-card:hover {
+      border-color: var(--anss-green-200);
+      box-shadow: 0 20px 44px rgba(22, 82, 37, 0.13);
+      transform: translateY(-5px);
+    }
+
+    .anss-service-card:focus-within {
+      border-color: #368c4c;
+      box-shadow: 0 0 0 3px rgba(54, 140, 76, 0.14), 0 16px 36px rgba(22, 82, 37, 0.12);
+    }
+
+    .anss-service-visual {
+      position: relative;
+      display: flex;
+      min-height: 156px;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid #cdebd4;
+      border-radius: 12px;
+      color: #216b41;
+      background: var(--anss-green-100);
+    }
+
+    .anss-service-visual::after {
+      position: absolute;
+      top: -52px;
+      right: -42px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: #d3f0da;
+      content: "";
+    }
+
+    .anss-service-visual > svg {
+      position: relative;
+      z-index: 1;
+      width: 68px;
+      height: 68px;
+    }
+
+    .anss-service-number {
+      position: absolute;
+      z-index: 2;
+      top: 14px;
+      left: 14px;
+      color: #368c4c;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+    }
+
+    .anss-service-content {
+      flex: 1 1 auto;
+      padding: 22px 4px 24px;
+    }
+
+    .anss-service-kicker {
+      display: block;
+      margin: 0 0 8px;
+      color: #368c4c;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      line-height: 1.35;
+      text-transform: uppercase;
+    }
+
+    .anss-service-content h3 {
+      margin: 0;
+      color: var(--anss-ink);
+      font-size: 25px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+    }
+
+    .anss-service-content p {
+      margin: 13px 0 0;
+      color: #626975;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.65;
+    }
+
+    .anss-service-footer {
+      margin: 0 -16px;
+      padding: 16px;
+      border-top: 1px solid var(--anss-line);
+    }
+
+    .anss-service-link {
+      display: flex;
+      min-height: 48px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 11px 16px;
+      border: 2px solid var(--anss-green-900);
+      border-radius: 12px;
+      color: #fff;
+      background: var(--anss-green-900);
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.35;
+      text-decoration: none;
+      transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .anss-service-link svg {
+      width: 19px;
+      height: 19px;
+      flex: 0 0 19px;
+      transition: transform 180ms ease;
+    }
+
+    .anss-service-link:hover {
+      border-color: #216b41;
+      color: #fff;
+      background: #216b41;
+      box-shadow: 0 8px 18px rgba(22, 82, 37, 0.2);
+    }
+
+    .anss-service-link:hover svg {
+      transform: translateX(3px);
+    }
+
+    .anss-service-link:focus-visible {
+      outline: 3px solid #368c4c;
+      outline-offset: 3px;
+    }
+
+    /* Keep the operational controls subtle while preserving map interaction. */
+    .esri-ui-corner .esri-component {
+      opacity: 0.72;
+    }
+
+    .esri-attribution {
+      font-size: 9px !important;
+    }
+
+    @media (max-width: 1100px) {
+      .anss-kpis {
+        padding-inline: 30px;
+      }
+
+      .anss-kpis__item {
+        padding-inline: 28px;
+      }
+
+      .anss-kpis__label {
+        font-size: 14px;
+      }
+
+      .anss-kpis__trend {
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 940px) {
+      .anss-kpis {
+        bottom: -118px;
+        min-height: 236px;
+        padding: 24px 28px;
+        border-radius: 28px;
+      }
+
+      .anss-kpis__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        min-height: 0;
+      }
+
+      .anss-kpis__item {
+        padding: 8px 24px 15px;
+      }
+
+      .anss-kpis__item:nth-child(odd) {
+        padding-left: 0;
+        border-left: 0;
+      }
+
+      .anss-kpis__item:nth-child(odd)::before {
+        display: none;
+      }
+
+      .anss-kpis__item:nth-child(even) {
+        padding-right: 0;
+      }
+
+      .anss-kpis__item:nth-child(n + 3) {
+        padding-top: 17px;
+        border-top: 1px solid #e6e8ea;
+      }
+
+      .anss-kpis__value {
+        margin-top: 4px;
+        font-size: 28px;
+      }
+
+      .anss-kpis__trend {
+        margin-top: 5px;
+      }
+
+      .anss-services-v2 {
+        padding-top: 214px;
+      }
+
+      .anss-services-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .anss-service-card:last-child {
+        grid-column: 1 / -1;
+        width: calc(50% - 12px);
+        justify-self: center;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .anss-explorer {
+        min-height: 820px;
+      }
+
+      .anss-explorer__map-shell {
+        inset: 300px 0 0;
+      }
+
+      .anss-explorer__content {
+        width: min(100% - 28px, 680px);
+        padding-top: 42px;
+      }
+
+      .anss-explorer__title {
+        max-width: 620px;
+        margin-top: 18px;
+        font-size: clamp(38px, 10.3vw, 50px);
+        line-height: 1.02;
+      }
+
+      .anss-explorer__intro {
+        max-width: 40ch;
+        margin-top: 20px;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      .territory-search {
+        width: min(100%, 480px);
+        margin-top: 38px;
+      }
+
+      .territory-search__field {
+        min-height: 58px;
+        border-radius: 16px;
+      }
+
+      .territory-card {
+        position: absolute;
+        top: auto !important;
+        right: 16px;
+        bottom: 170px;
+        left: 16px !important;
+        width: auto;
+        max-width: 430px;
+        margin: 0 auto;
+        transform: none !important;
+      }
+
+      .territory-card::after {
+        display: none;
+      }
+
+      .anss-explorer__demo-note {
+        right: 8px;
+        bottom: 118px;
+      }
+
+      .anss-explorer__loading {
+        top: 464px;
+      }
+
+      .anss-kpis {
+        bottom: -105px;
+        width: calc(100% - 24px);
+        min-height: 210px;
+        padding: 18px;
+        border-radius: 24px;
+      }
+
+      .anss-kpis__item {
+        padding: 7px 14px 12px;
+      }
+
+      .anss-kpis__item:nth-child(n + 3) {
+        padding-top: 13px;
+      }
+
+      .anss-kpis__label {
+        font-size: 12px;
+        white-space: normal;
+      }
+
+      .anss-kpis__value {
+        font-size: clamp(21px, 6.4vw, 27px);
+      }
+
+      .anss-kpis__trend {
+        font-size: 11px;
+        white-space: normal;
+      }
+
+      .anss-kpis__trend-icon {
+        width: 15px;
+        height: 15px;
+        margin-right: 2px;
+        vertical-align: -3px;
+      }
+
+      .anss-services-v2 {
+        padding: 200px 18px 72px;
+      }
+
+      .anss-services-header {
+        margin-bottom: 34px;
+      }
+
+      .anss-services-title {
+        font-size: clamp(30px, 9vw, 38px);
+      }
+
+      .anss-services-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .anss-service-card:last-child {
+        grid-column: auto;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .anss-explorer {
+        min-height: 790px;
+      }
+
+      .anss-explorer__content {
+        width: calc(100% - 24px);
+        padding-top: 32px;
+      }
+
+      .anss-explorer__badge {
+        font-size: 12px;
+      }
+
+      .anss-explorer__title {
+        font-size: clamp(34px, 10.8vw, 44px);
+      }
+
+      .anss-explorer__intro {
+        font-size: 15px;
+      }
+
+      .territory-search {
+        margin-top: 30px;
+      }
+
+      .territory-search__field {
+        padding-left: 15px;
+      }
+
+      .territory-search__input {
+        font-size: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <section class="anss-explorer" aria-labelledby="anss-explorer-title">
+      <div class="anss-explorer__map-shell" id="mapShell" role="region" aria-label="Carte interactive des territoires" aria-busy="false">
+        <div id="mapView"></div>
+        <div class="anss-explorer__map-veil" aria-hidden="true"></div>
+      </div>
+
+      <div class="anss-explorer__content">
+        <span class="anss-explorer__badge">ANSS HUB</span>
+
+        <h1 class="anss-explorer__title" id="anss-explorer-title">
+          <span class="anss-explorer__title-line">Explorez les données</span>
+          <span class="anss-explorer__title-line">
+            du <span class="anss-explorer__title-gradient">soutien social au Maroc</span>
+          </span>
+        </h1>
+
+        <p class="anss-explorer__intro">
+          Découvrez les territoires, indicateurs, applications et cartes thématiques du soutien social à travers une expérience géographique interactive.
+        </p>
+
+        <form class="territory-search" id="territorySearch" role="search" autocomplete="off">
+          <label class="sr-only" for="territoryInput">Rechercher une région ou un territoire</label>
+
+          <div class="territory-search__field">
+            <input
+              class="territory-search__input"
+              id="territoryInput"
+              name="territory"
+              type="search"
+              placeholder="Rechercher une région ou un territoire..."
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="territoryResults"
+              aria-expanded="false"
+              aria-activedescendant=""
+            >
+
+            <button class="territory-search__button" type="submit" aria-label="Lancer la recherche">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke-width="2"></circle>
+                <path d="m16.2 16.2 4.2 4.2" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+            </button>
+          </div>
+
+          <ul class="territory-search__results" id="territoryResults" role="listbox" hidden></ul>
+          <p class="territory-search__status" id="searchStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <article class="territory-card" id="territoryCard" aria-live="polite" hidden>
+        <h2 class="territory-card__title" id="territoryName">Casablanca-Settat</h2>
+        <dl class="territory-card__metrics">
+          <div class="territory-card__metric">
+            <dt>Nombre de dossiers éligibles</dt>
+            <dd id="eligibleCases">—</dd>
+          </div>
+          <div class="territory-card__metric">
+            <dt>Ménages bénéficiaires</dt>
+            <dd id="beneficiaryHouseholds">—</dd>
+          </div>
+          <div class="territory-card__metric">
+            <dt>Enfants soutenus</dt>
+            <dd id="supportedChildren">—</dd>
+          </div>
+        </dl>
+      </article>
+
+      <p class="anss-explorer__demo-note" id="demoNote" hidden>
+        Valeurs de démonstration — connecter la couche ANSS pour la production.
+      </p>
+
+      <div class="anss-explorer__loading" id="mapLoading" hidden>Chargement de la carte…</div>
+
+      <aside class="anss-kpis" aria-label="Indicateurs nationaux du soutien social">
+        <dl class="anss-kpis__grid">
+          <div class="anss-kpis__item">
+            <dt class="anss-kpis__label">Ménages bénéficiaires</dt>
+            <dd class="anss-kpis__value">4 002 396</dd>
+            <dd class="anss-kpis__trend">
+              <svg class="anss-kpis__trend-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 14 14 4"></path><path d="M7 4h7v7"></path>
+              </svg>+3,2% depuis 2025
+            </dd>
+          </div>
+          <div class="anss-kpis__item">
+            <dt class="anss-kpis__label">Population couverte</dt>
+            <dd class="anss-kpis__value">12 648 335</dd>
+            <dd class="anss-kpis__trend anss-kpis__trend--down">
+              <svg class="anss-kpis__trend-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m4 6 10 10"></path><path d="M7 16h7V9"></path>
+              </svg>−1,1% depuis 2025
+            </dd>
+          </div>
+          <div class="anss-kpis__item">
+            <dt class="anss-kpis__label">Enfants soutenus</dt>
+            <dd class="anss-kpis__value">5 510 003</dd>
+            <dd class="anss-kpis__trend">
+              <svg class="anss-kpis__trend-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 14 14 4"></path><path d="M7 4h7v7"></path>
+              </svg>+3,2% depuis 2025
+            </dd>
+          </div>
+          <div class="anss-kpis__item">
+            <dt class="anss-kpis__label">Nombre de veuves</dt>
+            <dd class="anss-kpis__value">4 749 427</dd>
+            <dd class="anss-kpis__trend">
+              <svg class="anss-kpis__trend-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 14 14 4"></path><path d="M7 4h7v7"></path>
+              </svg>+3,2% depuis 2025
+            </dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
+
+    <section class="anss-services-v2" aria-labelledby="anss-services-title">
+      <div class="anss-services-container">
+        <header class="anss-services-header">
+          <span class="anss-services-badge">Services du Hub</span>
+          <h2 class="anss-services-title" id="anss-services-title">
+            Explorez les <span>services du Hub</span>
+          </h2>
+          <p class="anss-services-subtitle">
+            Accédez aux applications, données ouvertes et cartes interactives de l'ANSS depuis un point d'entrée unique.
+          </p>
+        </header>
+
+        <div class="anss-services-grid">
+          <article class="anss-service-card">
+            <div class="anss-service-visual">
+              <span class="anss-service-number">01</span>
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="7" width="38" height="30" rx="6"></rect>
+                <rect x="11" y="13" width="10" height="7" rx="2"></rect>
+                <rect x="27" y="13" width="10" height="7" rx="2"></rect>
+                <rect x="11" y="25" width="10" height="6" rx="2"></rect>
+                <rect x="27" y="25" width="10" height="6" rx="2"></rect>
+                <path d="M18 42h12"></path>
+              </svg>
+            </div>
+            <div class="anss-service-content">
+              <span class="anss-service-kicker">Outils numériques</span>
+              <h3>Applications</h3>
+              <p>Découvrez les applications et tableaux de bord conçus pour analyser, gérer et valoriser les données sociales.</p>
+            </div>
+            <div class="anss-service-footer">
+              <a class="anss-service-link" href="https://geoportail.anss.gov.ma/portal/apps/sites/#/anss/pages/applications">
+                <span>Explorer les applications</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline>
+                </svg>
+              </a>
+            </div>
+          </article>
+
+          <article class="anss-service-card">
+            <div class="anss-service-visual">
+              <span class="anss-service-number">02</span>
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <ellipse cx="24" cy="11" rx="15" ry="6"></ellipse>
+                <path d="M9 11v10c0 3.3 6.7 6 15 6 3.1 0 6-.4 8.3-1.2"></path>
+                <path d="M9 21v10c0 3.3 6.7 6 15 6 2.7 0 5.2-.3 7.3-1"></path>
+                <path d="M39 22v16"></path><path d="m34 33 5 5 5-5"></path>
+              </svg>
+            </div>
+            <div class="anss-service-content">
+              <span class="anss-service-kicker">Données publiques</span>
+              <h3>Open data</h3>
+              <p>Consultez et téléchargez les jeux de données ouverts de l'ANSS dans des formats pensés pour leur réutilisation.</p>
+            </div>
+            <div class="anss-service-footer">
+              <a class="anss-service-link" href="https://geoportail.anss.gov.ma/portal/apps/sites/#/anss/pages/open-data">
+                <span>Accéder aux données</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline>
+                </svg>
+              </a>
+            </div>
+          </article>
+
+          <article class="anss-service-card">
+            <div class="anss-service-visual">
+              <span class="anss-service-number">03</span>
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m5 13 12-5 14 5 12-5v28l-12 5-14-5-12 5V13z"></path>
+                <path d="M17 8v28"></path><path d="M31 13v28"></path>
+                <path d="M30 17c0 5-6 10-6 10s-6-5-6-10a6 6 0 1 1 12 0z"></path>
+                <circle cx="24" cy="17" r="2"></circle>
+              </svg>
+            </div>
+            <div class="anss-service-content">
+              <span class="anss-service-kicker">Lecture territoriale</span>
+              <h3>Cartes interactives</h3>
+              <p>Visualisez les indicateurs sociaux et comparez les territoires à travers des cartes thématiques interactives.</p>
+            </div>
+            <div class="anss-service-footer">
+              <a class="anss-service-link" href="https://geoportail.anss.gov.ma/portal/apps/sites/#/anss/pages/cartes-interactives">
+                <span>Explorer les cartes</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline>
+                </svg>
+              </a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    /**
+     * PRODUCTION CONFIGURATION
+     * ------------------------
+     * 1. Paste the URL of the region/city Feature Layer into featureLayerUrl.
+     * 2. Match the field names below to the layer schema.
+     * 3. Set portalUrl to the Portal for ArcGIS base URL used by the ANSS site.
+     *
+     * The demo source is used only while featureLayerUrl is empty.
+     */
+    const CONFIG = {
+      portalUrl: "https://geoportail.anss.gov.ma/portal",
+      featureLayerUrl: "",
+      basemap: "gray-vector",
+      defaultTerritory: "Casablanca-Settat",
+      pointZoom: 11,
+      searchLimit: 8,
+      fields: {
+        objectId: "OBJECTID",
+        territoryName: "territory_name",
+        eligibleCases: "eligible_cases",
+        beneficiaryHouseholds: "beneficiary_households",
+        supportedChildren: "supported_children"
+      }
+    };
+
+    // Demonstration values are intentionally labeled in the interface.
+    const DEMO_TERRITORIES = [
+      { name: "Casablanca-Settat", longitude: -7.5898, latitude: 33.5731, eligible: 900385, households: 712840, children: 1124000 },
+      { name: "Rabat-Salé-Kénitra", longitude: -6.8498, latitude: 34.0209, eligible: 612400, households: 481750, children: 735600 },
+      { name: "Marrakech-Safi", longitude: -8.0083, latitude: 31.6295, eligible: 548250, households: 426900, children: 689300 },
+      { name: "Fès-Meknès", longitude: -5.0003, latitude: 34.0331, eligible: 505700, households: 398450, children: 642100 },
+      { name: "Tanger-Tétouan-Al Hoceïma", longitude: -5.8128, latitude: 35.7595, eligible: 438600, households: 344800, children: 552400 },
+      { name: "Souss-Massa", longitude: -9.5981, latitude: 30.4278, eligible: 392150, households: 308200, children: 497600 },
+      { name: "Béni Mellal-Khénifra", longitude: -6.3498, latitude: 32.3373, eligible: 314800, households: 247650, children: 401300 },
+      { name: "L'Oriental", longitude: -1.9076, latitude: 34.6814, eligible: 286900, households: 224500, children: 362800 },
+      { name: "Drâa-Tafilalet", longitude: -5.5328, latitude: 31.9314, eligible: 241600, households: 190400, children: 305700 },
+      { name: "Guelmim-Oued Noun", longitude: -10.0711, latitude: 28.9864, eligible: 128300, households: 101250, children: 162900 },
+      { name: "Laâyoune-Sakia El Hamra", longitude: -13.2033, latitude: 27.1253, eligible: 98400, households: 78150, children: 125700 },
+      { name: "Dakhla-Oued Ed-Dahab", longitude: -15.9570, latitude: 23.6848, eligible: 52400, households: 41600, children: 66800 }
+    ];
+
+    const elements = {
+      form: document.getElementById("territorySearch"),
+      input: document.getElementById("territoryInput"),
+      results: document.getElementById("territoryResults"),
+      status: document.getElementById("searchStatus"),
+      card: document.getElementById("territoryCard"),
+      name: document.getElementById("territoryName"),
+      eligible: document.getElementById("eligibleCases"),
+      households: document.getElementById("beneficiaryHouseholds"),
+      children: document.getElementById("supportedChildren"),
+      demoNote: document.getElementById("demoNote"),
+      loading: document.getElementById("mapLoading"),
+      mapShell: document.getElementById("mapShell")
+    };
+
+    const numberFormatter = new Intl.NumberFormat("fr-FR");
+    let mapView;
+    let territoryLayer;
+    let selectionLayer;
+    let currentFeature = null;
+    let currentResults = [];
+    let activeResultIndex = -1;
+    let searchTimer;
+    let loadingFailsafe;
+
+    function finishMapLoading() {
+      window.clearTimeout(loadingFailsafe);
+      elements.loading.hidden = true;
+      elements.mapShell.setAttribute("aria-busy", "false");
+    }
+
+    function setStatus(message) {
+      elements.status.textContent = message;
+    }
+
+    function valueOrDash(value) {
+      return value === null || value === undefined || value === ""
+        ? "—"
+        : numberFormatter.format(Number(value));
+    }
+
+    function getTerritoryName(feature) {
+      return feature?.attributes?.[CONFIG.fields.territoryName] || "Territoire";
+    }
+
+    function normalizeSearchText(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("fr");
+    }
+
+    function reportArcGISError(context, error) {
+      console.error(
+        context,
+        error?.name || "ArcGISError",
+        error?.message || String(error),
+        error?.details || ""
+      );
+    }
+
+    function getAnchorGeometry(geometry) {
+      if (!geometry) return null;
+      if (geometry.type === "point") return geometry;
+      return geometry.extent?.center || geometry.centroid || null;
+    }
+
+    function updateCard(feature) {
+      const attributes = feature.attributes || {};
+      elements.name.textContent = attributes[CONFIG.fields.territoryName] || "Territoire";
+      elements.eligible.textContent = valueOrDash(attributes[CONFIG.fields.eligibleCases]);
+      elements.households.textContent = valueOrDash(attributes[CONFIG.fields.beneficiaryHouseholds]);
+      elements.children.textContent = valueOrDash(attributes[CONFIG.fields.supportedChildren]);
+      elements.card.hidden = false;
+    }
+
+    function updateCardPosition() {
+      if (!mapView || !currentFeature || window.matchMedia("(max-width: 760px)").matches) return;
+      const anchor = getAnchorGeometry(currentFeature.geometry);
+      if (!anchor) return;
+
+      const screenPoint = mapView.toScreen(anchor);
+      const mapShell = document.querySelector(".anss-explorer__map-shell");
+      const shellTop = mapShell.offsetTop;
+      const sectionHeight = document.querySelector(".anss-explorer").offsetHeight;
+      const cardHalfWidth = elements.card.offsetWidth / 2;
+      const safeX = Math.max(cardHalfWidth + 16, Math.min(mapView.width - cardHalfWidth - 16, screenPoint.x));
+      const safeY = Math.min(sectionHeight - 30, Math.max(524, shellTop + screenPoint.y - 30));
+
+      elements.card.style.left = `${safeX}px`;
+      elements.card.style.top = `${safeY}px`;
+    }
+
+    function syncMapPadding() {
+      if (!mapView) return;
+      mapView.padding = window.matchMedia("(max-width: 760px)").matches
+        ? { top: 0, right: 0, bottom: 0, left: 0 }
+        : { top: 180, right: 0, bottom: 0, left: 0 };
+    }
+
+    async function focusTerritory(feature, announce = true, updateInput = true) {
+      if (!feature?.geometry) return;
+      currentFeature = feature;
+      updateCard(feature);
+
+      const anchor = getAnchorGeometry(feature.geometry);
+      selectionLayer.removeAll();
+      selectionLayer.add({
+        geometry: anchor,
+        symbol: {
+          type: "simple-marker",
+          size: 42,
+          style: "circle",
+          color: [164, 229, 178, 0.72],
+          outline: { color: [164, 229, 178, 0], width: 0 }
+        }
+      });
+      selectionLayer.add({
+        geometry: anchor,
+        symbol: {
+          type: "simple-marker",
+          size: 22,
+          style: "circle",
+          color: [27, 126, 55, 1],
+          outline: { color: [255, 255, 255, 0.92], width: 1.5 }
+        }
+      });
+
+      if (updateInput) elements.input.value = getTerritoryName(feature);
+      closeResults();
+      if (announce) setStatus(`${getTerritoryName(feature)} affiché sur la carte.`);
+
+      try {
+        syncMapPadding();
+        if (feature.geometry.type === "point") {
+          await mapView.goTo({ target: feature.geometry, zoom: CONFIG.pointZoom }, { duration: 850 });
+        } else {
+          await mapView.goTo(feature.geometry.extent?.expand(1.7) || feature.geometry, { duration: 850 });
+        }
+      } catch (error) {
+        if (error?.name !== "AbortError") reportArcGISError("Navigation cartographique", error);
+      }
+
+      updateCardPosition();
+    }
+
+    function closeResults() {
+      activeResultIndex = -1;
+      elements.results.hidden = true;
+      elements.input.setAttribute("aria-expanded", "false");
+      elements.input.removeAttribute("aria-activedescendant");
+    }
+
+    function renderResults(features, query) {
+      elements.results.replaceChildren();
+      currentResults = features;
+      activeResultIndex = -1;
+
+      if (!features.length) {
+        const empty = document.createElement("li");
+        empty.className = "territory-search__empty";
+        empty.textContent = `Aucun territoire trouvé pour « ${query} ». Essayez un nom de région plus court.`;
+        elements.results.append(empty);
+        elements.results.hidden = false;
+        elements.input.setAttribute("aria-expanded", "true");
+        setStatus("Aucun résultat. Essayez un autre nom de région.");
+        return;
+      }
+
+      features.forEach((feature, index) => {
+        const item = document.createElement("li");
+        item.setAttribute("role", "presentation");
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "territory-search__option";
+        button.id = `territory-option-${index}`;
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", "false");
+        button.textContent = getTerritoryName(feature);
+        button.addEventListener("click", () => focusTerritory(feature));
+
+        item.append(button);
+        elements.results.append(item);
+      });
+
+      elements.results.hidden = false;
+      elements.input.setAttribute("aria-expanded", "true");
+      setStatus(`${features.length} résultat${features.length > 1 ? "s" : ""} disponible${features.length > 1 ? "s" : ""}.`);
+    }
+
+    function setActiveResult(index) {
+      if (!currentResults.length || elements.results.hidden) return;
+      const options = [...elements.results.querySelectorAll("[role='option']")];
+      activeResultIndex = (index + options.length) % options.length;
+      options.forEach((option, optionIndex) => {
+        option.setAttribute("aria-selected", String(optionIndex === activeResultIndex));
+      });
+      const activeOption = options[activeResultIndex];
+      elements.input.setAttribute("aria-activedescendant", activeOption.id);
+      activeOption.scrollIntoView({ block: "nearest" });
+    }
+
+    async function findTerritories(rawQuery, shouldRender = true) {
+      const query = rawQuery.trim();
+      if (query.length < 2) {
+        if (shouldRender) {
+          closeResults();
+          setStatus(query.length ? "Saisissez au moins deux caractères." : "");
+        }
+        return [];
+      }
+
+      if (shouldRender) setStatus("Recherche en cours…");
+      const escaped = query.replaceAll("'", "''");
+      const field = CONFIG.fields.territoryName;
+      const layerQuery = territoryLayer.createQuery();
+      // Client-side FeatureLayer SQL in the Enterprise 11.5-matched SDK does
+      // not support every server SQL function. Query the small demo source
+      // with a universal clause, then filter accent/case-insensitively in JS.
+      layerQuery.where = CONFIG.featureLayerUrl
+        ? `${field} LIKE '%${escaped}%'`
+        : "1=1";
+      layerQuery.outFields = [
+        CONFIG.fields.objectId,
+        CONFIG.fields.territoryName,
+        CONFIG.fields.eligibleCases,
+        CONFIG.fields.beneficiaryHouseholds,
+        CONFIG.fields.supportedChildren
+      ];
+      layerQuery.returnGeometry = true;
+      layerQuery.num = CONFIG.featureLayerUrl ? CONFIG.searchLimit : DEMO_TERRITORIES.length;
+      layerQuery.orderByFields = [`${field} ASC`];
+
+      try {
+        const result = await territoryLayer.queryFeatures(layerQuery);
+        const features = CONFIG.featureLayerUrl
+          ? result.features
+          : result.features
+              .filter((feature) => normalizeSearchText(getTerritoryName(feature)).includes(normalizeSearchText(query)))
+              .sort((a, b) => getTerritoryName(a).localeCompare(getTerritoryName(b), "fr"))
+              .slice(0, CONFIG.searchLimit);
+        if (shouldRender) renderResults(features, query);
+        return features;
+      } catch (error) {
+        reportArcGISError("Recherche territoriale", error);
+        if (shouldRender) {
+          closeResults();
+          setStatus("La recherche est momentanément indisponible. Réessayez.");
+        }
+        return [];
+      }
+    }
+
+    function buildDemoLayer(FeatureLayer, Graphic) {
+      const fields = CONFIG.fields;
+      const source = DEMO_TERRITORIES.map((territory, index) => new Graphic({
+        geometry: {
+          type: "point",
+          longitude: territory.longitude,
+          latitude: territory.latitude,
+          spatialReference: { wkid: 4326 }
+        },
+        attributes: {
+          [fields.objectId]: index + 1,
+          [fields.territoryName]: territory.name,
+          [fields.eligibleCases]: territory.eligible,
+          [fields.beneficiaryHouseholds]: territory.households,
+          [fields.supportedChildren]: territory.children
+        }
+      }));
+
+      return new FeatureLayer({
+        title: "Territoires ANSS — démonstration",
+        source,
+        objectIdField: fields.objectId,
+        geometryType: "point",
+        spatialReference: { wkid: 4326 },
+        fields: [
+          { name: fields.objectId, alias: "Identifiant", type: "oid" },
+          { name: fields.territoryName, alias: "Territoire", type: "string" },
+          { name: fields.eligibleCases, alias: "Dossiers éligibles", type: "integer" },
+          { name: fields.beneficiaryHouseholds, alias: "Ménages bénéficiaires", type: "integer" },
+          { name: fields.supportedChildren, alias: "Enfants soutenus", type: "integer" }
+        ],
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-marker",
+            size: 8,
+            color: [37, 136, 62, 0.12],
+            outline: { color: [37, 136, 62, 0.1], width: 1 }
+          }
+        },
+        popupEnabled: false
+      });
+    }
+
+    async function initialize() {
+      elements.loading.textContent = "Chargement de la carte…";
+      elements.loading.hidden = false;
+      elements.mapShell.setAttribute("aria-busy", "true");
+      loadingFailsafe = window.setTimeout(finishMapLoading, 1800);
+
+      const [Map, MapView, FeatureLayer, Graphic, GraphicsLayer, esriConfig, reactiveUtils] = await $arcgis.import([
+        "@arcgis/core/Map.js",
+        "@arcgis/core/views/MapView.js",
+        "@arcgis/core/layers/FeatureLayer.js",
+        "@arcgis/core/Graphic.js",
+        "@arcgis/core/layers/GraphicsLayer.js",
+        "@arcgis/core/config.js",
+        "@arcgis/core/core/reactiveUtils.js"
+      ]);
+
+      if (CONFIG.portalUrl) esriConfig.portalUrl = CONFIG.portalUrl;
+
+      territoryLayer = CONFIG.featureLayerUrl
+        ? new FeatureLayer({ url: CONFIG.featureLayerUrl, outFields: ["*"], popupEnabled: false })
+        : buildDemoLayer(FeatureLayer, Graphic);
+
+      selectionLayer = new GraphicsLayer({ title: "Territoire sélectionné", listMode: "hide" });
+
+      const map = new Map({
+        basemap: CONFIG.basemap,
+        layers: [territoryLayer, selectionLayer]
+      });
+
+      mapView = new MapView({
+        container: "mapView",
+        map,
+        center: [-7.5898, 33.5731],
+        zoom: 11,
+        constraints: { minZoom: 4, maxZoom: 16 },
+        popupEnabled: false,
+        highlightOptions: { color: [37, 136, 62, 1], haloOpacity: 0.35, fillOpacity: 0.08 }
+      });
+
+      await mapView.when();
+      finishMapLoading();
+      syncMapPadding();
+      await territoryLayer.load();
+
+      try {
+        mapView.ui.move("zoom", "bottom-right");
+      } catch (_) {
+        // Some Enterprise-matched SDK builds expose different default UI components.
+      }
+
+      elements.demoNote.hidden = Boolean(CONFIG.featureLayerUrl);
+
+      const defaults = await findTerritories(CONFIG.defaultTerritory, false);
+      if (defaults[0]) await focusTerritory(defaults[0], false, false);
+      setStatus("Recherchez un territoire ou sélectionnez un point sur la carte.");
+
+      mapView.on("click", async (event) => {
+        const response = await mapView.hitTest(event, { include: [territoryLayer] });
+        const hit = response.results.find((result) => result.graphic?.layer === territoryLayer);
+        if (hit?.graphic) await focusTerritory(hit.graphic);
+      });
+
+      reactiveUtils.watch(() => mapView.extent, updateCardPosition);
+      window.addEventListener("resize", () => {
+        syncMapPadding();
+        updateCardPosition();
+      }, { passive: true });
+    }
+
+    elements.input.addEventListener("input", () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => findTerritories(elements.input.value), 260);
+    });
+
+    elements.input.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActiveResult(activeResultIndex + 1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveResult(activeResultIndex - 1);
+      } else if (event.key === "Enter" && activeResultIndex >= 0) {
+        event.preventDefault();
+        focusTerritory(currentResults[activeResultIndex]);
+      } else if (event.key === "Escape") {
+        closeResults();
+      }
+    });
+
+    elements.form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (activeResultIndex >= 0 && currentResults[activeResultIndex]) {
+        await focusTerritory(currentResults[activeResultIndex]);
+        return;
+      }
+
+      const matches = await findTerritories(elements.input.value);
+      if (matches.length) await focusTerritory(matches[0]);
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (!elements.form.contains(event.target)) closeResults();
+    });
+
+    initialize().catch((error) => {
+      reportArcGISError("Initialisation de la carte", error);
+      window.clearTimeout(loadingFailsafe);
+      elements.mapShell.setAttribute("aria-busy", "false");
+      elements.loading.hidden = false;
+      elements.loading.textContent = "Impossible de charger la carte. Vérifiez la connexion et la configuration du portail.";
+      setStatus("La carte n'a pas pu être chargée.");
+      window.setTimeout(() => { elements.loading.hidden = true; }, 5000);
+    });
+  </script>
+</body>
+</html>
